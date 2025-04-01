@@ -1,26 +1,35 @@
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
+import numpy as np
 
 
-def build_lr_model() -> LinearRegression:
+def fit_lr_model(x: np.ndarray, y: np.ndarray) -> LinearRegression:
     """
-    Creates and returns a Linear Regression model.
-
-    Returns:
-        LinearRegression: A scikit-learn LinearRegression model instance.
-    """
-    return LinearRegression()
-
-
-def build_poly_model(degree: int) -> PolynomialFeatures:
-    """
-    Creates and returns a PolynomialFeatures transformer with the specified degree.
+    Fits a Linear Regression model to the given training data.
 
     Args:
+        x (np.ndarray): Feature matrix of shape (n_samples, n_features).
+        y (np.ndarray): Target values of shape (n_samples,).
+
+    Returns:
+        LinearRegression: A trained scikit-learn LinearRegression model.
+    """
+
+    lr = LinearRegression()
+    return lr.fit(x, y)
+
+
+def create_poly_features(x: np.ndarray, degree: int) -> np.ndarray:
+    """
+    Transforms input features into polynomial features of the specified degree.
+
+    Args:
+        x (np.ndarray): Input feature array of shape (n_samples, n_features).
         degree (int): The degree of the polynomial features to generate.
 
     Returns:
-        PolynomialFeatures: A scikit-learn PolynomialFeatures instance.
+        np.ndarray: Transformed feature array with polynomial features.
     """
 
-    return PolynomialFeatures(degree=degree)
+    pf = PolynomialFeatures(degree=degree)
+    return pf.fit_transform(x)
