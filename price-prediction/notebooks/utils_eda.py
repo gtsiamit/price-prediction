@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from typing import Optional, Union, List
+from typing import Optional, Union, List, Tuple
 
 
 def plot_boxplot(
@@ -145,4 +145,42 @@ def plot_correlaction_matrix(
                 fontsize=text_fontsize,
             )
 
+    plt.show()
+
+
+def scatter_plot(
+    x: np.ndarray,
+    y: np.ndarray,
+    title: str,
+    xlabel: str,
+    ylabel: str,
+    figsize: Tuple[int, int] = (6, 6),
+    marker_size: int = 4,
+) -> None:
+    """
+    Plots a scatter plot of the given x and y data points.
+
+    Args:
+        x (np.ndarray): Array-like object containing x-axis data points.
+        y (np.ndarray): Array-like object containing y-axis data points.
+        title (str): Title of the scatter plot.
+        xlabel (str): Label for the x-axis.
+        ylabel (str): Label for the y-axis.
+        figsize (Tuple[int, int], optional): Figure size in inches (width, height). Defaults to (6, 6).
+        marker_size (int, optional): Size of the scatter plot markers. Defaults to 4.
+
+
+    """
+    # set figure size
+    plt.figure(figsize=figsize)
+
+    # create scatter plot with specified marker size
+    plt.scatter(x=x, y=y, s=marker_size)
+
+    # set plot title and axis labels
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+
+    # display the plot
     plt.show()
