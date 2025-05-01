@@ -4,3 +4,4 @@ __pycache__
 price-prediction/dataset/
 price-prediction/experiments/single_regression/output/
 price-prediction/notebooks/testing.ipynb
+price-prediction/experiments/multiple_regression/output/
