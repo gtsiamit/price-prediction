@@ -2,7 +2,7 @@ import argparse
 import os
 from pathlib import Path
 import numpy as np
-from model import *
+from model import fit_lr_model
 from utils import load_df
 from sklearn.preprocessing import StandardScaler, KBinsDiscretizer
 from sklearn.model_selection import StratifiedKFold
@@ -52,32 +52,66 @@ def bins_discretize(x: np.ndarray) -> np.ndarray:
 def train_exp():
     """
     Handles the experimentation process.
-    Data load, transformations, models fit, evaluation, results store.
+    Data load, transformations, model fit, evaluation, results store.
     """
 
     # load data
     data = load_df(DATASET_PATH)
 
-    # set x (sqft_living) and y (price)
-    x = data["sqft_living"].to_numpy().reshape(-1, 1)
+    # transform feature columns
+    # calculate years from year built
+    data["years"] = data["yr_built"].apply(lambda x: 2025 - x)
+    # boolean feature renovated from year renovated
+    data["renovated"] = data["yr_renovated"].apply(lambda x: 0 if x == 0 else 1)
+
+    # set x and y (price)
+    x_columns = [
+        "bedrooms",
+        "bathrooms",
+        "sqft_living",
+        "sqft_lot",
+        "floors",
+        "sqft_basement",
+        "years",
+        "lat",
+        "long",
+        "waterfront",
+        "view",
+        "condition",
+        "grade",
+        "renovated",
+    ]
+    x = data[x_columns].copy()
     y = data["price"].to_numpy()
 
-    # scale data
-    x_scaled = standard_scaling(x)
-    y_sc, y_scaled = standard_scaling(y.reshape(-1, 1), return_scaler=True)
+    # scale continuus numerical features
+    x_scaled = x[
+        [
+            "bedrooms",
+            "bathrooms",
+            "sqft_living",
+            "sqft_lot",
+            "floors",
+            "sqft_basement",
+            "years",
+            "lat",
+            "long",
+        ]
+    ]
+    x_non_scaled = x[
+        ["waterfront", "view", "condition", "grade", "renovated"]
+    ].to_numpy()
+    x_scaled = standard_scaling(x_scaled.to_numpy())
+    # concat scaled and non-scaled data
+    x = np.concatenate([x_scaled, x_non_scaled], axis=1)
 
-    # create polynomial features and apply scaling
-    # 2nd degree
-    x_poly_2deg = create_poly_features(x, degree=2)
-    x_poly_2deg = standard_scaling(x_poly_2deg)
-    # 3rd degree
-    x_poly_3deg = create_poly_features(x, degree=3)
-    x_poly_3deg = standard_scaling(x_poly_3deg)
+    # scale y data
+    y_sc, y_scaled = standard_scaling(y.reshape(-1, 1), return_scaler=True)
 
     # define empty lists for storing actual and predicted
     # values during the StratifiedKFold
     x_actual_folds, y_actual = [], []
-    y_pred_lr, y_pred_poly2, y_pred_poly3 = [], [], []
+    y_pred = []
 
     # separate the data in bins according to price in
     # order to perform stratified train test split
@@ -88,12 +122,8 @@ def train_exp():
     for num_fold, (train_index, test_index) in enumerate(skf.split(x, y_bins)):
         print(f"----- Fold {num_fold+1} -----")
 
-        # x data for linear regression
-        x_train_lr, x_test_lr = x_scaled[train_index], x_scaled[test_index]
-        # x data for 2nd degree polynomial regression
-        x_train_poly2, x_test_poly2 = x_poly_2deg[train_index], x_poly_2deg[test_index]
-        # x data for 3rd degree polynomial regression
-        x_train_poly3, x_test_poly3 = x_poly_3deg[train_index], x_poly_3deg[test_index]
+        # x data for multiple linear regression
+        x_train, x_test = x[train_index], x[test_index]
         # y data
         y_train, y_test = y_scaled[train_index], y_scaled[test_index]
 
@@ -101,67 +131,31 @@ def train_exp():
         y_actual.append(y_test)
         x_actual_folds.append(x[test_index].flatten())
 
-        # fit linear regression model and make predictions
+        # fit multiple linear regression model and make predictions
         print("Linear Regression")
-        lr = fit_lr_model(x=x_train_lr, y=y_train)
-        pred_lr = lr.predict(x_test_lr)
-        y_pred_lr.append(pred_lr)
-
-        # fit 2nd degree polynomial regression model
-        print("2nd degree Polynomial Regression")
-        poly2_reg = fit_lr_model(x=x_train_poly2, y=y_train)
-        pred_poly2 = poly2_reg.predict(x_test_poly2)
-        y_pred_poly2.append(pred_poly2)
-
-        # fit 3rd degree polynomial regression model
-        print("3rd degree Polynomial Regression")
-        poly3_reg = fit_lr_model(x=x_train_poly3, y=y_train)
-        pred_poly3 = poly3_reg.predict(x_test_poly3)
-        y_pred_poly3.append(pred_poly3)
+        mlr = fit_lr_model(x=x_train, y=y_train)
+        pred_lr = mlr.predict(x_test)
+        y_pred.append(pred_lr)
 
     # concatenate y test data and y predicted from all folds
     y_actual_all = np.concatenate(y_actual)
-    y_pred_lr_all = np.concatenate(y_pred_lr)
-    y_pred_poly2_all = np.concatenate(y_pred_poly2)
-    y_pred_poly3_all = np.concatenate(y_pred_poly3)
+    y_pred_lr_all = np.concatenate(y_pred)
     x_actual_folds_all = np.concatenate(x_actual_folds)
 
     # bring the y values to the original scale
     y_actual_all = y_sc.inverse_transform(y_actual_all)
     y_pred_lr_all = y_sc.inverse_transform(y_pred_lr_all)
-    y_pred_poly2_all = y_sc.inverse_transform(y_pred_poly2_all)
-    y_pred_poly3_all = y_sc.inverse_transform(y_pred_poly3_all)
 
-    # calculate metrics in order to evaluate the models
+    # calculate metrics in order to evaluate the model
     print("Calculating evaluation metrics")
-    lr_mse, lr_mae, lr_r2 = (
+    mlr_mse, mlr_mae, mlr_r2 = (
         mean_squared_error(y_true=y_actual_all, y_pred=y_pred_lr_all),
         mean_absolute_error(y_true=y_actual_all, y_pred=y_pred_lr_all),
         r2_score(y_true=y_actual_all, y_pred=y_pred_lr_all),
     )
-    poly2_mse, poly2_mae, poly2_r2 = (
-        mean_squared_error(y_true=y_actual_all, y_pred=y_pred_poly2_all),
-        mean_absolute_error(y_true=y_actual_all, y_pred=y_pred_poly2_all),
-        r2_score(y_true=y_actual_all, y_pred=y_pred_poly2_all),
-    )
-    poly3_mse, poly3_mae, poly3_r2 = (
-        mean_squared_error(y_true=y_actual_all, y_pred=y_pred_poly3_all),
-        mean_absolute_error(y_true=y_actual_all, y_pred=y_pred_poly3_all),
-        r2_score(y_true=y_actual_all, y_pred=y_pred_poly3_all),
-    )
 
     # format metrics in str in order to be stored in txt
-    metrics_lr = [f"MSE: {lr_mse}\n", f"MAE: {lr_mae}\n", f"R2 Score: {lr_r2}\n"]
-    metrics_poly2 = [
-        f"MSE: {poly2_mse}\n",
-        f"MAE: {poly2_mae}\n",
-        f"R2 Score: {poly2_r2}\n",
-    ]
-    metrics_poly3 = [
-        f"MSE: {poly3_mse}\n",
-        f"MAE: {poly3_mae}\n",
-        f"R2 Score: {poly3_r2}\n",
-    ]
+    metrics_mlr = [f"MSE: {mlr_mse}\n", f"MAE: {mlr_mae}\n", f"R2 Score: {mlr_r2}\n"]
 
     # store results, y of each fold and y scaler locally
     print("Storing results")
@@ -172,16 +166,6 @@ def train_exp():
         fname=OUTPUT_PATH.joinpath("y_pred_lr_all.csv"), X=y_pred_lr_all, delimiter=","
     )
     np.savetxt(
-        fname=OUTPUT_PATH.joinpath("y_pred_poly2_all.csv"),
-        X=y_pred_poly2_all,
-        delimiter=",",
-    )
-    np.savetxt(
-        fname=OUTPUT_PATH.joinpath("y_pred_poly3_all.csv"),
-        X=y_pred_poly3_all,
-        delimiter=",",
-    )
-    np.savetxt(
         fname=OUTPUT_PATH.joinpath("x_actual_folds_all.csv"),
         X=x_actual_folds_all,
         delimiter=",",
@@ -190,12 +174,8 @@ def train_exp():
     with open(OUTPUT_PATH.joinpath("sc.pkl"), "wb") as f:
         pickle.dump(y_sc, f)
 
-    with open(OUTPUT_PATH.joinpath("lr_results.txt"), "w") as f:
-        f.writelines(metrics_lr)
-    with open(OUTPUT_PATH.joinpath("poly2_results.txt"), "w") as f:
-        f.writelines(metrics_poly2)
-    with open(OUTPUT_PATH.joinpath("poly3_results.txt"), "w") as f:
-        f.writelines(metrics_poly3)
+    with open(OUTPUT_PATH.joinpath("mlr_results.txt"), "w") as f:
+        f.writelines(metrics_mlr)
 
     print("Execution Finished")
 
