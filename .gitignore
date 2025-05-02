@@ -2,6 +2,6 @@ __pycache__
 .DS_Store
 .vscode
 price-prediction/dataset/
-price-prediction/experiments/single_regression/output/
 price-prediction/notebooks/testing.ipynb
-price-prediction/experiments/multiple_regression/output/
+price-prediction/experimentation/output_sr/
+price-prediction/experimentation/output_mlr/
