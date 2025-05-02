@@ -4,54 +4,17 @@ from pathlib import Path
 import numpy as np
 from model import fit_lr_model
 from utils import load_df
-from sklearn.preprocessing import StandardScaler, KBinsDiscretizer
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import pickle
+from features import standard_scaling, bins_discretize
 
 FILEDIR = Path(__file__).parent
 
 
-def standard_scaling(x: np.ndarray, return_scaler: bool = False) -> np.ndarray:
-    """
-    Applies standard scaling to the input data. Optionally, returns
-    the fitted StandardScaler object.
-
-    Args:
-        x (np.ndarray): Input data to be scaled.
-        return_scaler (bool, optional): If True, returns the fitted StandardScaler
-                                        object along with the scaled data. Defaults to False.
-
-    Returns:
-        StandardScaler (optional): Fitted StandardScaler object, only returned if `return_scaler=True`.
-        np.ndarray: Scaled data with mean 0 and standard deviation 1.
-    """
-
-    sc = StandardScaler()
-    if return_scaler:
-        return sc, sc.fit_transform(x)
-    else:
-        return sc.fit_transform(x)
-
-
-def bins_discretize(x: np.ndarray) -> np.ndarray:
-    """
-    Discretizes continuous data into bins using quantile-based binning.
-
-    Args:
-        x (np.ndarray): Input array of continuous values.
-
-    Returns:
-        np.ndarray: Discretized integer bin labels.
-    """
-
-    bd = KBinsDiscretizer(encode="ordinal", strategy="quantile", random_state=2025)
-    return bd.fit_transform(x).astype(int).flatten()
-
-
 def train_exp():
     """
-    Handles the experimentation process.
+    Handles the experimentation process, for multiple linear regression.
     Data load, transformations, model fit, evaluation, results store.
     """
 
@@ -196,7 +159,7 @@ def main():
 
     # set and create (if not exists) the output folder
     global OUTPUT_PATH
-    OUTPUT_PATH = FILEDIR.joinpath("output")
+    OUTPUT_PATH = FILEDIR.joinpath("output_mlr")
     os.makedirs(OUTPUT_PATH, exist_ok=True)
 
     # run train experiments
